@@ -1,0 +1,209 @@
+#%%
+import jax
+import jax.numpy as jnp
+from jax import random
+from time import time
+import optax
+from jax import value_and_grad
+from functools import partial
+from jax import jit
+from tqdm import tqdm
+from typing import Any
+from flax import struct
+from flax.serialization import to_state_dict, from_state_dict
+import pickle
+from pathlib import Path
+import matplotlib.pyplot as plt
+import scipy.stats as st
+from scipy.interpolate import interpn
+import h5py
+from scipy.io import loadmat
+import argparse
+from Tecplot_mesh import tecplot_Mesh
+from tqdm import tqdm
+#%%
+class Model(struct.PyTreeNode):
+    params: Any
+    forward: callable = struct.field(pytree_node=False)
+    def __apply__(self,*args):
+        return self.forward(*args)
+
+class PINNbase:
+    def __init__(self,c):
+        c.get_outdirs()
+        self.c=c
+
+class PINN(PINNbase):
+    def test(self):
+        all_params = {"domain":{}, "data":{}, "network":{}, "problem":{}}
+        all_params["domain"] = self.c.domain.init_params(**self.c.domain_init_kwargs)
+        all_params["data"] = self.c.data.init_params(**self.c.data_init_kwargs)
+        global_key = random.PRNGKey(42)
+        all_params["network"] = self.c.network.init_params(**self.c.network_init_kwargs)
+        all_params["problem"] = self.c.problem.init_params(**self.c.problem_init_kwargs)
+        optimiser = self.c.optimization_init_kwargs["optimiser"](self.c.optimization_init_kwargs["learning_rate"])
+        grids, all_params = self.c.domain.sampler(all_params)
+        train_data, all_params = self.c.data.train_data(all_params)
+        #all_params = self.c.problem.constraints(all_params)
+        #valid_data = self.c.problem.exact_solution(all_params)
+        model_fn = c.network.network_fn
+        return all_params, model_fn, train_data
+
+def temporal_error(path, foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn):
+    
+    # Load the parameters
+    pos_ref = all_params["domain"]["in_max"].flatten()
+
+    # Create the evaluation grid
+    gridbase = [np.linspace(domain_range[key][0], domain_range[key][1], output_shape[i]) for i, key in enumerate(['t', 'x', 'y', 'z'])]
+    gridbase_n = [gridbase[i].copy()/pos_ref[i] for i in range(len(gridbase))]
+    if order[0] == 0:
+        if order[1] == 1:
+            z_e, y_e, x_e = np.meshgrid(gridbase[-1], gridbase[-2], gridbase[-3], indexing='ij')
+            z_n, y_n, x_n = np.meshgrid(gridbase_n[-1], gridbase_n[-2], gridbase_n[-3], indexing='ij')
+        else:
+            y_e, z_e, x_e = np.meshgrid(gridbase[-2], gridbase[-1], gridbase[-3], indexing='ij')
+            y_n, z_n, x_n = np.meshgrid(gridbase_n[-2], gridbase_n[-1], gridbase_n[-3], indexing='ij')
+    elif order[0] == 1:
+        if order[1] == 0:
+            z_e, x_e, y_e = np.meshgrid(gridbase[-1], gridbase[-3], gridbase[-2], indexing='ij')
+            z_n, x_n, y_n = np.meshgrid(gridbase_n[-1], gridbase_n[-3], gridbase_n[-2], indexing='ij')
+        else:
+            y_e, x_e, z_e = np.meshgrid(gridbase[-2], gridbase[-3], gridbase[-1], indexing='ij')
+            y_n, x_n, z_n = np.meshgrid(gridbase_n[-2], gridbase_n[-3], gridbase_n[-1], indexing='ij')
+    elif order[0] == 2:
+        if order[1] == 0:
+            x_e, z_e, y_e = np.meshgrid(gridbase[-3], gridbase[-1], gridbase[-2], indexing='ij')
+            x_n, z_n, y_n = np.meshgrid(gridbase_n[-3], gridbase_n[-1], gridbase_n[-2], indexing='ij')
+        else:
+            x_e, y_e, z_e = np.meshgrid(gridbase[-3], gridbase[-2], gridbase[-1], indexing='ij')
+            x_n, y_n, z_n = np.meshgrid(gridbase_n[-3], gridbase_n[-2], gridbase_n[-1], indexing='ij')
+    filenames = sorted(glob(path + 'ground/ts_' + '*.npy'))
+
+    u_error_list = []
+    v_error_list = []
+    w_error_list = []
+    vel_error_list = []
+    pre_error_list = []
+    fluc_error_list = []
+    temp_error_list = []
+    for timestep in range(len(filenames)):
+        t_n = np.zeros(output_shape[1:]) + gridbase_n[0][timestep]
+        eval_grid = np.concatenate([t_n.reshape(-1,1), x_n.reshape(-1,1), y_n.reshape(-1,1), z_n.reshape(-1,1)], axis=1)
+
+        # Load Ground truth data if is_ground is True
+        if is_ground:
+            ground_data = np.load(path + 'ground/ts_' + str(timestep).zfill(2) + '.npy')
+        if is_mean:
+            mean_data = np.load(path + 'mean/mean.npy')
+            print(mean_data.shape)
+
+        # Evaluate the derivatives
+        uvwp = [model_fn(all_params, eval_grid[i:i+10000]) for i in range(0, eval_grid.shape[0], 10000)]
+
+        # Concatenate the results
+        uvwp = np.concatenate(uvwp, axis=0)
+        uvwp[:,0] = uvwp[:,0]*all_params["data"]['u_ref']
+        uvwp[:,1] = uvwp[:,1]*all_params["data"]['v_ref']
+        uvwp[:,2] = uvwp[:,2]*all_params["data"]['w_ref']
+        uvwp[:,3] = uvwp[:,3]*all_params["data"]['u_ref']
+        uvwp[:,3] = 1.185*(uvwp[:,3] - np.mean(uvwp[:,3]))
+
+        if is_ground:
+            grounds = [ground_data[:,i+4].reshape(-1,1) for i in range(3)]
+            V_mag = np.sqrt(grounds[0]**2 + grounds[1]**2 + grounds[2]**2)
+            f = np.concatenate([(uvwp[:,i].reshape(-1,1) - grounds[i]) for i in range(3)],1)
+            div = np.concatenate([grounds[i] for i in range(3)],1)
+            vel_error_list.append(np.linalg.norm(f, ord='fro')/np.linalg.norm(div, ord='fro'))
+            u_error_list.append(np.linalg.norm(uvwp[:,0].reshape(-1,1) - grounds[0])/np.linalg.norm(V_mag))
+            v_error_list.append(np.linalg.norm(uvwp[:,1].reshape(-1,1) - grounds[1])/np.linalg.norm(V_mag))
+            w_error_list.append(np.linalg.norm(uvwp[:,2].reshape(-1,1) - grounds[2])/np.linalg.norm(V_mag))
+            if uvwp.shape[1] > 3:
+                p_ground = ground_data[:,7].reshape(-1,1) - np.mean(ground_data[:,7])
+                pre_error_list.append(np.linalg.norm(uvwp[:,3].reshape(-1,1) - p_ground)/np.linalg.norm(p_ground))
+            if uvwp.shape[1] > 4:
+                temp_ground = ground_data[:,8].reshape(-1,1)
+                temp_error_list.append(np.linalg.norm(uvwp[:,4].reshape(-1,1) - temp_ground)/np.linalg.norm(temp_ground))
+        if is_mean:
+            means = [mean_data[:,i].reshape(-1,1) for i in range(3)]
+            flucs = [uvwp[:,i].reshape(-1,1) - means[i] for i in range(3)]
+            flucs_g = [grounds[i].reshape(-1,1) - means[i] for i in range(3)]
+            f = np.concatenate([(flucs[i].reshape(-1,1) - flucs_g[i]) for i in range(3)],1)
+            div = np.concatenate([flucs_g[i] for i in range(3)],1)
+            fluc_error_list.append(np.linalg.norm(f, ord='fro')/np.linalg.norm(div, ord='fro'))
+        #p1 = plt.plot(np.mean(np.mean(uvwp[:,3].reshape(31,88,410),axis=0),axis=0))
+        #p2 = plt.plot(np.mean(np.mean(p_ground.reshape(31,88,410)-np.mean(p_ground),axis=0),axis=0))
+        #plt.savefig(path + 'Errors/' + foldername + '/pressure' + str(timestep).zfill(2)+'.png')
+        #plt.close()
+    matching_values = []
+    matching_names = []
+    name = 'abc'
+    for name in locals():
+        if '_error_list' in name:
+            if len(locals()[name]) != 0:
+                matching_values.append(locals()[name])
+                matching_names.append(name)
+
+    if not os.path.exists(path + 'Errors/' + foldername):
+        os.makedirs(path + 'Errors/' + foldername)
+    with open(path + 'Errors/' + foldername + '/error_list.txt', 'w') as f:
+        for matching_name in matching_names:
+            f.write(f"{matching_name:20}")
+        f.write('\n')
+    with open(path + 'Errors/' + foldername + '/error_list.txt', 'a') as f:
+        for i in range(len(matching_values[0])):
+            for j in range(len(matching_values)):
+                f.write(f"{matching_values[j][i]:<20f}")
+            f.write('\n')
+#%%
+if __name__ == "__main__":
+    from domain import *
+    from trackdata import *
+    from network import *
+    from constants import *
+    from problem import *
+    from txt_reader import *
+    import os
+    parser = argparse.ArgumentParser(description='PINN')
+    parser.add_argument('-f', '--foldername', type=str, help='foldername', default='HIT')
+    parser.add_argument('-c', '--config', type=str, help='configuration', default='eval_config')
+    args = parser.parse_args()
+
+    # Get evaluation configuration
+    cur_dir = os.getcwd()
+    config_txt = cur_dir + '/' + args.config + '.txt'
+    data = parse_tree_structured_txt(config_txt)
+
+    # Get model constants
+    with open(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/summary/constants.pickle','rb') as f:
+        constants = pickle.load(f)
+    values = list(constants.values())
+
+    c = Constants(run = values[0],
+                domain_init_kwargs = values[1],
+                data_init_kwargs = values[2],
+                network_init_kwargs = values[3],
+                problem_init_kwargs = values[4],
+                optimization_init_kwargs = values[5],
+                equation_init_kwargs = values[6],)
+    run = PINN(c)
+
+    # Get model parameters
+    checkpoint_list = sorted(glob(run.c.model_out_dir+'/*.pkl'), key=lambda x: int(x.split('_')[-1].split('.')[0]))
+    print(checkpoint_list)
+    with open(checkpoint_list[-1],"rb") as f:
+        model_params = pickle.load(f)
+    all_params, model_fn, train_data = run.test()
+    model = Model(all_params["network"]["layers"], model_fn)
+    all_params["network"]["layers"] = from_state_dict(model, model_params).params
+    domain_range = data['tecplot_init_kwargs']['domain_range']
+    output_shape = data['tecplot_init_kwargs']['out_shape']
+    order = data['tecplot_init_kwargs']['order']
+    timestep = data['tecplot_init_kwargs']['timestep']
+    is_ground = data['tecplot_init_kwargs']['is_ground']
+    path = data['tecplot_init_kwargs']['path']
+    is_mean = data['tecplot_init_kwargs']['is_mean']
+    path = os.path.dirname(cur_dir) + '/' + path
+    pos_ref = all_params["domain"]["in_max"].flatten()
+
+    temporal_error(path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn)

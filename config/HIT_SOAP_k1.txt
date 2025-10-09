@@ -1,0 +1,7 @@
+run: ETFS/HIT/config/HIT_FF_k1/
+domain_init_kwargs: {'domain_range': {'t': (0, 0.04), 'x': (0, 0.1), 'y': (0, 0.1), 'z': (0, 0.1)}, 'grid_size': [51, 5120, 5120, 5120], 'bound_keys': ['bczl']}
+data_init_kwargs: {'path': '/ETFS/HIT/train_data/lv1/', 'path_ff': '/ETFS/HIT/ground/', 'data_keys': ['pos', 'vel', 'p'], 'viscosity': 1.5e-05, 'u_ref': 1.5, 'v_ref': 1.5, 'w_ref': 0.9, 'p_ref': 1.5}
+network_init_kwargs: {'key': 0, 'layer_sizes': [4, 10, 10, 4], 'network_name': 'MLP'}
+problem_init_kwargs: {'loss_weights1': (1.0, 1.0, 1.0, 1e-02, 1e-02, 1e-02, 1e-02), 'loss_weights2': (1.0, 1.0, 1.0, 1e-02, 1e-02, 1e-02, 1e-02, 1e-06, 1e-06, 1e-06, 1e-06), 'path_s': '/ETFS/HIT/ground/'}
+optimization_init_kwargs: {'optimiser': 'soap', 'learning_rate': 0.001, 'decay_step': 20000, 'decay_rate': 0.9, 'n_steps1': 2010, 'n_steps2': 100000000, 'save_step': 1000, 'p_batch': 10000, 'e_batch': 10000, 'b_batch': 10000, 'f_batch': 10000}
+equation_init_kwargs: {'equation1': 'FF_equation', 'equation2': 'Boundless_flow_FF',}
