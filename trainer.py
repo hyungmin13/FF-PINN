@@ -179,7 +179,7 @@ class PINN(PINNbase):
             self.report1(i, report_fn1, dynamic_params, all_params, p_batch, v_batch, g_batch, ffgrid_batch, ffval_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
             self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
 
-        update = PINN_update2.lower(model_states, optimiser_fn, equation_fn2, dynamic_params, static_params, static_keys, g_batch, p_batch, v_batch, b_batches, model_fn).compile()
+        update = PINN_update2.lower(model_states, optimiser_fn, equation_fn2, dynamic_params, static_params, static_keys, ffgrid_batch, ffval_batch, g_batch, p_batch, v_batch, b_batches, model_fn).compile()
         
         # Training loop
         for i in tqdm(range(self.c.optimization_init_kwargs["n_steps2"])):
