@@ -23,7 +23,7 @@ class Model(struct.PyTreeNode):
     forward: callable = struct.field(pytree_node=False)
     def __apply__(self,*args):
         return self.forward(*args)
-"""
+
 @partial(jax.jit, static_argnums=(1, 2, 5, 12))
 def PINN_update1(model_states, optimiser_fn, equation_fn, dynamic_params, static_params, static_keys, grids, ff_grid, ff_val, particles, particle_vel, particle_bd, model_fn):
     static_leaves, treedef = static_keys
@@ -33,9 +33,9 @@ def PINN_update1(model_states, optimiser_fn, equation_fn, dynamic_params, static
     updates, model_states = optimiser_fn(grads, model_states, dynamic_params)
     dynamic_params = optax.apply_updates(dynamic_params, updates)
     return lossval, model_states, dynamic_params
-"""
-@partial(jax.jit, static_argnums=(1, 2, 5, 10))
-def PINN_update2(model_states, optimiser_fn, equation_fn, dynamic_params, static_params, static_keys, grids, particles, particle_vel, particle_bd, model_fn):
+
+@partial(jax.jit, static_argnums=(1, 2, 5, 12))
+def PINN_update2(model_states, optimiser_fn, equation_fn, dynamic_params, static_params, static_keys, grids, ff_grid, ff_val, particles, particle_vel, particle_bd, model_fn):
     static_leaves, treedef = static_keys
     leaves = [d if s is None else s for d, s in zip(static_params, static_leaves)]
     all_params = jax.tree_util.tree_unflatten(treedef, leaves)
@@ -78,8 +78,8 @@ class PINN(PINNbase):
         dynamic_params = all_params["network"].pop("layers")
 
         # Define equation function
-        #equation_fn1 = self.c.equation1.Loss
-        #report_fn1 = self.c.equation1.Loss_report
+        equation_fn1 = self.c.equation1.Loss
+        report_fn1 = self.c.equation1.Loss_report
         equation_fn2 = self.c.equation2.Loss
         report_fn2 = self.c.equation2.Loss_report
         # Input data and grids
@@ -119,7 +119,7 @@ class PINN(PINNbase):
         data_fv = []
         for i in tqdm(range(N1//B)):
             batch_p = train_data1['pos'][perm1[i*B:(i+1)*B],:]
-            batch_v = train_data1['vel'][perm2[i*B:(i+1)*B],:]
+            batch_v = train_data1['vel'][perm1[i*B:(i+1)*B],:]
             data_p.append(batch_p)
             data_v.append(batch_v)
         data_p.append(train_data1['pos'][perm1[-10001:-1],:])
@@ -139,25 +139,7 @@ class PINN(PINNbase):
         v_batch = next(v_batches)
         ffgrid_batch = next(fp_batches)
         ffval_batch = next(fv_batches)
-        #p_batch = random.choice(keys_next[0],train_data1['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-        #v_batch = random.choice(keys_next[0],train_data1['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-        #idx = jax.random.randint(keys_next[0], (10000,), 0, 99609375)
-        #a = jnp.take(train_data2['pos'], idx, axis=0)
-        #p_batch2 = random.choice(keys_next[0],train_data1['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-        #v_batch2 = random.choice(keys_next[0],train_data1['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-        #ffgrid_batch = random.choice(keys_next[0],train_data2['pos'][:5242081,:],shape=(self.c.optimization_init_kwargs["f_batch"],))
-        #ffval_batch = random.choice(keys_next[0],train_data2_[:5242081,:],shape=(self.c.optimization_init_kwargs["f_batch"],))
-        #ffgrid_batch = jit_sample.lower(keys_next[0], train_data2['pos'], self.c.optimization_init_kwargs["p_batch"])
-        #ffval_batch = jit_sample.lower(keys_next[0], train_data2_, self.c.optimization_init_kwargs["p_batch"])
-        #perm = random.permutation(keys_next[0], train_data2['pos'].shape[0])
-        #idx = perm[:10000]
-        #ffgrid_batch = jnp.take(train_data2['pos'], idx, axis=0)
-        #ffval_batch = jnp.take(train_data2_, idx, axis=0)
-        #N = train_data2['pos'].shape[0]
-        #idx = random.randint(keys_next[0], (self.c.optimization_init_kwargs["f_batch"],), 0, N)
-        #ffgrid_batch = jnp.take(train_data2['pos'], idx, axis=0)
-        #ffval_batch = jnp.take(train_data2_, idx, axis=0)
-        #ffgrid_batch, ffval_batch = sample_batch(keys_next[0], train_data2['pos'], train_data2_)
+
         g_batch = jnp.stack([random.choice(keys_next[k+1], 
                                            grids['eqns'][arg], 
                                            shape=(self.c.optimization_init_kwargs["e_batch"],)) 
@@ -169,7 +151,7 @@ class PINN(PINNbase):
                                             shape=(self.c.optimization_init_kwargs["e_batch"],)) 
                                 for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
             b_batches.append(b_batch)
-        """
+
         # Initializing the update function
         update = PINN_update1.lower(model_states, optimiser_fn, equation_fn1, dynamic_params, static_params, static_keys, g_batch, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batches, model_fn).compile()
         
@@ -196,7 +178,7 @@ class PINN(PINNbase):
         
             self.report1(i, report_fn1, dynamic_params, all_params, p_batch, v_batch, g_batch, ffgrid_batch, ffval_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
             self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
-        """
+
         update = PINN_update2.lower(model_states, optimiser_fn, equation_fn2, dynamic_params, static_params, static_keys, g_batch, p_batch, v_batch, b_batches, model_fn).compile()
         
         # Training loop
@@ -226,7 +208,7 @@ class PINN(PINNbase):
             lossval, model_states, dynamic_params = update(model_states, dynamic_params, static_params, g_batch, p_batch, v_batch, b_batches)
         
         
-            self.report2(i, report_fn2, dynamic_params, all_params, p_batch, v_batch, g_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
+            self.report2(i, report_fn2, dynamic_params, all_params, p_batch, v_batch, g_batch, ffgrid_batch, ffval_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
             self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
         
     def save_model(self, i, dynamic_params, all_params, save_step, model_fns):
@@ -269,7 +251,7 @@ class PINN(PINNbase):
         return
 
     
-    def report2(self, i, report_fn, dynamic_params, all_params, p_batch, v_batch, g_batch, b_batch, valid_data, e_batch_key, save_step, model_fns):
+    def report2(self, i, report_fn, dynamic_params, all_params, p_batch, v_batch, g_batch, ffgrid_batch, ffval_batch, b_batch, valid_data, e_batch_key, save_step, model_fns):
         save_report = (i % save_step == 0)
         if save_report:
             all_params["network"]["layers"] = dynamic_params
@@ -286,7 +268,7 @@ class PINN(PINNbase):
             if v_pred.shape[1] == 5:
                 T_error = jnp.sqrt(jnp.mean((all_params["data"]["T_ref"]*v_pred[:,4] - e_batch_T)**2)/jnp.mean(e_batch_T**2))
 
-            Losses = report_fn(dynamic_params, all_params, g_batch, p_batch, v_batch, b_batch, model_fns)
+            Losses = report_fn(dynamic_params, all_params, ffgrid_batch, ffval_batch, g_batch, p_batch, v_batch, b_batch, model_fns)
             if v_pred.shape[1] == 5:
                 print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}} T_error : {T_error:<{12}.{5}}")
                 with open(self.c.report_out_dir + "reports.txt", "a") as f:
