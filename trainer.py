@@ -205,7 +205,7 @@ class PINN(PINNbase):
                                     for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
                 b_batches.append(b_batch)
             loss_factor = jnp.exp(-i*0.01)
-            lossval, model_states, dynamic_params = update(model_states, dynamic_params, static_params, g_batch, p_batch, v_batch, b_batches)
+            lossval, model_states, dynamic_params = update(model_states, dynamic_params, static_params, g_batch, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batches)
         
         
             self.report2(i, report_fn2, dynamic_params, all_params, p_batch, v_batch, g_batch, ffgrid_batch, ffval_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
