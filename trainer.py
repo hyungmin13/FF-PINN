@@ -117,14 +117,14 @@ class PINN(PINNbase):
         data_v = []
         data_fp = []
         data_fv = []
-        for i in tqdm(range(N1//B)):
+        for i in range(N1//B):
             batch_p = train_data1['pos'][perm1[i*B:(i+1)*B],:]
             batch_v = train_data1['vel'][perm1[i*B:(i+1)*B],:]
             data_p.append(batch_p)
             data_v.append(batch_v)
         data_p.append(train_data1['pos'][perm1[-10001:-1],:])
         data_v.append(train_data1['vel'][perm1[-10001:-1],:])
-        for i in tqdm(range(N2//B)):
+        for i in range(N2//B):
             batch_fp = train_data2['pos'][perm2[i*B:(i+1)*B],:]
             batch_fv = train_data2_ [perm2[i*B:(i+1)*B],:]
             data_fp.append(batch_fp)
@@ -156,7 +156,7 @@ class PINN(PINNbase):
         update = PINN_update1.lower(model_states, optimiser_fn, equation_fn1, dynamic_params, static_params, static_keys, g_batch, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batches, model_fn).compile()
         
         # Training loop
-        for i in tqdm(range(self.c.optimization_init_kwargs["n_steps1"])):
+        for i in range(self.c.optimization_init_kwargs["n_steps1"]):
             keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
             p_batch = next(p_batches)
             v_batch = next(v_batches)
@@ -182,7 +182,7 @@ class PINN(PINNbase):
         update = PINN_update2.lower(model_states, optimiser_fn, equation_fn2, dynamic_params, static_params, static_keys, loss_factor, ffgrid_batch, ffval_batch, g_batch, p_batch, v_batch, b_batches, model_fn).compile()
         
         # Training loop
-        for i in tqdm(range(self.c.optimization_init_kwargs["n_steps2"])):
+        for i in range(self.c.optimization_init_kwargs["n_steps2"]):
             keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
             #p_batch = random.choice(keys_next[0],train_data1['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
             #v_batch = random.choice(keys_next[0],train_data1['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
