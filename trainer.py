@@ -39,7 +39,7 @@ def PINN_update2(model_states, optimiser_fn, equation_fn, dynamic_params, static
     static_leaves, treedef = static_keys
     leaves = [d if s is None else s for d, s in zip(static_params, static_leaves)]
     all_params = jax.tree_util.tree_unflatten(treedef, leaves)
-    lossval, grads = value_and_grad(equation_fn, argnums=0)(dynamic_params, all_params, grids, particles, particle_vel, particle_bd, model_fn)
+    lossval, grads = value_and_grad(equation_fn, argnums=0)(dynamic_params, all_params, grids, ff_grid, ff_val, particles, particle_vel, particle_bd, model_fn)
     updates, model_states = optimiser_fn(grads, model_states, dynamic_params)
     dynamic_params = optax.apply_updates(dynamic_params, updates)
     return lossval, model_states, dynamic_params
