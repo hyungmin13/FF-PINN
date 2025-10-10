@@ -92,7 +92,7 @@ class Boundless_flow_FF(Equation):
         self.all_params = all_params
     
     @staticmethod
-    def Loss(dynamic_params, all_params, g_batch, ff_grid, ff_val, particles, particle_vel, boundaries, model_fns):
+    def Loss(dynamic_params, all_params, loss_factor, g_batch, ff_grid, ff_val, particles, particle_vel, boundaries, model_fns):
         def first_order(all_params, g_batch, cotangent, model_fns):
             def u_t(batch):
                 return model_fns(all_params, batch)
@@ -179,13 +179,12 @@ class Boundless_flow_FF(Equation):
         loss_NS3 = jnp.mean(loss_NS3**2)
 
         total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
-                    weights[3]*loss_fu + weights[4]*loss_fv + weights[5]*loss_fw + \
-                    weights[6]*loss_fp + weights[7]*loss_con + weights[8]*loss_NS1 + \
-                    weights[9]*loss_NS2 + weights[10]*loss_NS3
+                    loss_factor*(weights[3]*loss_fu + weights[4]*loss_fv + weights[5]*loss_fw) + weights[6]*loss_fp + \
+                    (1-loss_factor)*(weights[7]*loss_con + weights[8]*loss_NS1 + weights[9]*loss_NS2 + weights[10]*loss_NS3)
         return total_loss
     
     @staticmethod
-    def Loss_report(dynamic_params, all_params, g_batch, ff_grid, ff_val, particles, particle_vel, boundaries, model_fns):
+    def Loss_report(dynamic_params, all_params, loss_factor, g_batch, ff_grid, ff_val, particles, particle_vel, boundaries, model_fns):
         def first_order(all_params, g_batch, cotangent, model_fns):
             def u_t(batch):
                 return model_fns(all_params, batch)
@@ -272,9 +271,8 @@ class Boundless_flow_FF(Equation):
         loss_NS3 = jnp.mean(loss_NS3**2)
 
         total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
-                    weights[3]*loss_fu + weights[4]*loss_fv + weights[5]*loss_fw + \
-                    weights[6]*loss_fp + weights[7]*loss_con + weights[8]*loss_NS1 + \
-                    weights[9]*loss_NS2 + weights[10]*loss_NS3
+                    loss_factor*(weights[3]*loss_fu + weights[4]*loss_fv + weights[5]*loss_fw + weights[6]*loss_fp) + \
+                    (1-loss_factor)*(weights[7]*loss_con + weights[8]*loss_NS1 + weights[9]*loss_NS2 + weights[10]*loss_NS3)
         return total_loss, loss_u, loss_v, loss_w, loss_fu, loss_fv, loss_fw, loss_fp, loss_con, loss_NS1, loss_NS2, loss_NS3
 
 

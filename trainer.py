@@ -34,12 +34,12 @@ def PINN_update1(model_states, optimiser_fn, equation_fn, dynamic_params, static
     dynamic_params = optax.apply_updates(dynamic_params, updates)
     return lossval, model_states, dynamic_params
 
-@partial(jax.jit, static_argnums=(1, 2, 5, 12))
-def PINN_update2(model_states, optimiser_fn, equation_fn, dynamic_params, static_params, static_keys, grids, ff_grid, ff_val, particles, particle_vel, particle_bd, model_fn):
+@partial(jax.jit, static_argnums=(1, 2, 5, 13))
+def PINN_update2(model_states, optimiser_fn, equation_fn, dynamic_params, static_params, static_keys, loss_factor, grids, ff_grid, ff_val, particles, particle_vel, particle_bd, model_fn):
     static_leaves, treedef = static_keys
     leaves = [d if s is None else s for d, s in zip(static_params, static_leaves)]
     all_params = jax.tree_util.tree_unflatten(treedef, leaves)
-    lossval, grads = value_and_grad(equation_fn, argnums=0)(dynamic_params, all_params, grids, ff_grid, ff_val, particles, particle_vel, particle_bd, model_fn)
+    lossval, grads = value_and_grad(equation_fn, argnums=0)(dynamic_params, all_params, loss_factor, grids, ff_grid, ff_val, particles, particle_vel, particle_bd, model_fn)
     updates, model_states = optimiser_fn(grads, model_states, dynamic_params)
     dynamic_params = optax.apply_updates(dynamic_params, updates)
     return lossval, model_states, dynamic_params
@@ -178,8 +178,8 @@ class PINN(PINNbase):
         
             self.report1(i, report_fn1, dynamic_params, all_params, p_batch, v_batch, g_batch, ffgrid_batch, ffval_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
             self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
-
-        update = PINN_update2.lower(model_states, optimiser_fn, equation_fn2, dynamic_params, static_params, static_keys, ffgrid_batch, ffval_batch, g_batch, p_batch, v_batch, b_batches, model_fn).compile()
+        loss_factor = jnp.exp(0)
+        update = PINN_update2.lower(model_states, optimiser_fn, equation_fn2, dynamic_params, static_params, loss_factor, static_keys, ffgrid_batch, ffval_batch, g_batch, p_batch, v_batch, b_batches, model_fn).compile()
         
         # Training loop
         for i in tqdm(range(self.c.optimization_init_kwargs["n_steps2"])):
@@ -205,10 +205,10 @@ class PINN(PINNbase):
                                     for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
                 b_batches.append(b_batch)
             loss_factor = jnp.exp(-i*0.01)
-            lossval, model_states, dynamic_params = update(model_states, dynamic_params, static_params, g_batch, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batches)
+            lossval, model_states, dynamic_params = update(model_states, dynamic_params, static_params, loss_factor, g_batch, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batches)
         
         
-            self.report2(i, report_fn2, dynamic_params, all_params, p_batch, v_batch, g_batch, ffgrid_batch, ffval_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
+            self.report2(i, report_fn2, dynamic_params, all_params, loss_factor, p_batch, v_batch, g_batch, ffgrid_batch, ffval_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
             self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
         
     def save_model(self, i, dynamic_params, all_params, save_step, model_fns):
@@ -251,7 +251,7 @@ class PINN(PINNbase):
         return
 
     
-    def report2(self, i, report_fn, dynamic_params, all_params, p_batch, v_batch, g_batch, ffgrid_batch, ffval_batch, b_batch, valid_data, e_batch_key, save_step, model_fns):
+    def report2(self, i, report_fn, dynamic_params, all_params, loss_factor, p_batch, v_batch, g_batch, ffgrid_batch, ffval_batch, b_batch, valid_data, e_batch_key, save_step, model_fns):
         save_report = (i % save_step == 0)
         if save_report:
             all_params["network"]["layers"] = dynamic_params
@@ -268,7 +268,7 @@ class PINN(PINNbase):
             if v_pred.shape[1] == 5:
                 T_error = jnp.sqrt(jnp.mean((all_params["data"]["T_ref"]*v_pred[:,4] - e_batch_T)**2)/jnp.mean(e_batch_T**2))
 
-            Losses = report_fn(dynamic_params, all_params, ffgrid_batch, ffval_batch, g_batch, p_batch, v_batch, b_batch, model_fns)
+            Losses = report_fn(dynamic_params, all_params, loss_factor, ffgrid_batch, ffval_batch, g_batch, p_batch, v_batch, b_batch, model_fns)
             if v_pred.shape[1] == 5:
                 print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}} T_error : {T_error:<{12}.{5}}")
                 with open(self.c.report_out_dir + "reports.txt", "a") as f:
