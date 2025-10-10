@@ -158,10 +158,10 @@ class PINN(PINNbase):
         # Training loop
         for i in tqdm(range(self.c.optimization_init_kwargs["n_steps1"])):
             keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
-            p_batch = random.choice(keys_next[0],train_data1['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-            v_batch = random.choice(keys_next[0],train_data1['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-            ffgrid_batch = random.choice(keys_next[0],train_data2['pos'],shape=(self.c.optimization_init_kwargs["f_batch"],))
-            ffval_batch = random.choice(keys_next[0],train_data2_,shape=(self.c.optimization_init_kwargs["f_batch"],))
+            p_batch = next(p_batches)
+            v_batch = next(v_batches)
+            ffgrid_batch = next(fp_batches)
+            ffval_batch = next(fv_batches)
             g_batch = jnp.stack([random.choice(keys_next[k+1], 
                                             grids['eqns'][arg], 
                                             shape=(self.c.optimization_init_kwargs["e_batch"],)) 
