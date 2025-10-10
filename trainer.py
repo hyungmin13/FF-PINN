@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as st
 from soap_jax import soap
 import tqdm
+import itertools
 class Model(struct.PyTreeNode):
     params: Any
     forward: callable = struct.field(pytree_node=False)
@@ -57,11 +58,6 @@ class PINNbase:
 
 class PINN(PINNbase):
     def train(self):
-        @jax.jit
-        def sample_batch(key, data1, data2):
-            idx = random.randint(key, (10000,), 0, 99609375)
-            return jnp.take(data1, idx, axis=0), jnp.take(data2, idx, axis=0)
-        
         all_params = {"domain":{}, "data":{}, "network":{}, "problem":{}}
         all_params["domain"] = self.c.domain.init_params(**self.c.domain_init_kwargs)
         all_params["data"] = self.c.data.init_params(**self.c.data_init_kwargs)
@@ -90,9 +86,7 @@ class PINN(PINNbase):
         grids, all_params = self.c.domain.sampler(all_params)
         train_data1, all_params = self.c.data.train_data(all_params)
         train_data2 = self.c.data.ff_data(all_params.copy())
-        print(train_data1['pos'].shape, train_data2['pos'].shape)
         train_data2_ = np.concatenate([train_data2['vel'], train_data2['p'].reshape(-1,1)],1)
-        #print(train_data2_.shape)
         valid_data = self.c.problem.exact_solution(all_params.copy())
 
         # Input key initialization
@@ -110,9 +104,41 @@ class PINN(PINNbase):
         static_keys = (static_leaves, treedef)
 
         # Initializing batches
-        idx = jax.random.randint(keys_next[0], (10000,), 0, 5242081)
-        p_batch = jnp.take(train_data1['pos'], idx, axis=0)
-        v_batch = jnp.take(train_data1['vel'], idx, axis=0)
+
+        #idx = jax.random.randint(keys_next[0], (10000,), 0, 5242081)
+        #p_batch = jnp.take(train_data1['pos'], idx, axis=0)
+        #v_batch = jnp.take(train_data1['vel'], idx, axis=0)
+        N1 = train_data1['pos'].shape[0]
+        N2 = train_data2['pos'].shape[0]
+        B = 10000
+        perm1 = random.permutation(keys_next[0], N1)
+        perm2 = random.permutation(keys_next[0], N2)
+        data_p = []
+        data_v = []
+        data_fp = []
+        data_fv = []
+        for i in tqdm(range(N1//B)):
+            batch_p = train_data1['pos'][perm1[i*B:(i+1)*B],:]
+            batch_v = train_data1['vel'][perm2[i*B:(i+1)*B],:]
+            data_p.append(batch_p)
+            data_v.append(batch_v)
+        data_p.append(train_data1['pos'][perm1[-10001:-1],:])
+        data_v.append(train_data1['vel'][perm1[-10001:-1],:])
+        for i in tqdm(range(N2//B)):
+            batch_fp = train_data2['pos'][perm2[i*B:(i+1)*B],:]
+            batch_fv = train_data2_ [perm2[i*B:(i+1)*B],:]
+            data_fp.append(batch_fp)
+            data_fv.append(batch_fv)
+        data_fp.append(train_data2['pos'][perm2[-10001:-1],:])
+        data_fv.append(train_data2_ [perm2[-10001:-1],:])
+        p_batches = itertools.cycle(data_p)
+        v_batches = itertools.cycle(data_v)
+        fp_batches = itertools.cycle(data_fp)
+        fv_batches = itertools.cycle(data_fv)
+        p_batch = next(p_batches)
+        v_batch = next(v_batches)
+        ffgrid_batch = next(fp_batches)
+        ffval_batch = next(fv_batches)
         #p_batch = random.choice(keys_next[0],train_data1['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
         #v_batch = random.choice(keys_next[0],train_data1['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
         #idx = jax.random.randint(keys_next[0], (10000,), 0, 99609375)
@@ -176,28 +202,15 @@ class PINN(PINNbase):
         # Training loop
         for i in tqdm(range(self.c.optimization_init_kwargs["n_steps2"])):
             keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
-            idx = jax.random.randint(keys_next[0], (10000,), 0, 5242081)
-            p_batch = jnp.take(train_data1['pos'], idx, axis=0)
-            v_batch = jnp.take(train_data1['vel'], idx, axis=0)
-            p_batch2 = jnp.take(train_data1['pos'], idx, axis=0)
-            v_batch2 = jnp.take(train_data1['vel'], idx, axis=0)
             #p_batch = random.choice(keys_next[0],train_data1['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
             #v_batch = random.choice(keys_next[0],train_data1['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-            #idx = jax.random.randint(keys_next[0], (10000,), 0, self.c.optimization_init_kwargs["p_batch"])
-            #a = jnp.take(train_data2['pos'], idx, axis=0)
-            #p_batch2 = random.choice(keys_next[0],train_data1['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-            #v_batch2 = random.choice(keys_next[0],train_data1['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-            #ffgrid_batch = random.choice(keys_next[0],train_data2['pos'][:5242081,:],shape=(self.c.optimization_init_kwargs["f_batch"],))
-            #ffval_batch = random.choice(keys_next[0],train_data2_[:5242081,:],shape=(self.c.optimization_init_kwargs["f_batch"],))
-            #idx = random.randint(keys_next[0], (self.c.optimization_init_kwargs["f_batch"],), 0, N)
-            #ffgrid_batch = jnp.take(train_data2['pos'], idx, axis=0)
-            #ffval_batch = jnp.take(train_data2_, idx, axis=0)
-            #ffgrid_batch = jit_sample(keys_next[0], train_data2['pos'], self.c.optimization_init_kwargs["p_batch"])
-            #ffval_batch = jit_sample(keys_next[0], train_data2_, self.c.optimization_init_kwargs["p_batch"])
-            #idx = perm[i*10000:(i+1)*10000]
-            #ffgrid_batch = jnp.take(train_data2['pos'], idx, axis=0)
-            #ffval_batch = jnp.take(train_data2_, idx, axis=0)
-            #ffgrid_batch, ffval_batch = sample_batch(keys_next[0], train_data2['pos'], train_data2_)
+            p_batch = next(p_batches)
+            v_batch = next(v_batches)
+            ffgrid_batch = next(fp_batches)
+            ffval_batch = next(fv_batches)
+            #ffgrid_batch = random.choice(keys_next[0],train_data2['pos'],shape=(self.c.optimization_init_kwargs["f_batch"],))
+            #ffval_batch = random.choice(keys_next[0],train_data2_,shape=(self.c.optimization_init_kwargs["f_batch"],))
+
             g_batch = jnp.stack([random.choice(keys_next[k+1], 
                                             grids['eqns'][arg], 
                                             shape=(self.c.optimization_init_kwargs["e_batch"],)) 
