@@ -180,7 +180,7 @@ class PINN(PINNbase):
             self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
         loss_factor = jnp.exp(0)
         update = PINN_update2.lower(model_states, optimiser_fn, equation_fn2, dynamic_params, static_params, static_keys, loss_factor, ffgrid_batch, ffval_batch, g_batch, p_batch, v_batch, b_batches, model_fn).compile()
-        j = i.copy()
+        j = i
         # Training loop
         for k in range(self.c.optimization_init_kwargs["n_steps2"]):
             i = j + k
@@ -205,7 +205,7 @@ class PINN(PINNbase):
                                                 shape=(self.c.optimization_init_kwargs["e_batch"],)) 
                                     for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
                 b_batches.append(b_batch)
-            loss_factor = jnp.exp(-i*0.01)
+            loss_factor = jnp.exp(-k*0.0001)
             lossval, model_states, dynamic_params = update(model_states, dynamic_params, static_params, loss_factor, g_batch, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batches)
         
         
