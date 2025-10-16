@@ -179,7 +179,7 @@ class PINN(PINNbase):
             self.report1(i, report_fn1, dynamic_params, all_params, p_batch, v_batch, g_batch, ffgrid_batch, ffval_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
             self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
         loss_factor = jnp.exp(0)
-        update = PINN_update2.lower(model_states, optimiser_fn, equation_fn2, dynamic_params, static_params, static_keys, loss_factor, ffgrid_batch, ffval_batch, g_batch, p_batch, v_batch, b_batches, model_fn).compile()
+        update = PINN_update2.lower(model_states, optimiser_fn, equation_fn2, dynamic_params, static_params, static_keys, loss_factor, g_batch, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batches, model_fn).compile()
         j = i
         # Training loop
         for k in range(self.c.optimization_init_kwargs["n_steps2"]):
@@ -269,7 +269,7 @@ class PINN(PINNbase):
             if v_pred.shape[1] == 5:
                 T_error = jnp.sqrt(jnp.mean((all_params["data"]["T_ref"]*v_pred[:,4] - e_batch_T)**2)/jnp.mean(e_batch_T**2))
 
-            Losses = report_fn(dynamic_params, all_params, loss_factor, ffgrid_batch, ffval_batch, g_batch, p_batch, v_batch, b_batch, model_fns)
+            Losses = report_fn(dynamic_params, all_params, loss_factor, g_batch, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batch, model_fns)
             if v_pred.shape[1] == 5:
                 print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}} T_error : {T_error:<{12}.{5}}")
                 with open(self.c.report_out_dir + "reports.txt", "a") as f:

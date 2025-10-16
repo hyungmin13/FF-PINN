@@ -42,7 +42,6 @@ class FF_equation(Equation):
 
         loss_w = all_params["data"]['w_ref']*p_out[:,2:3] - particle_vel[:,2:3]
         loss_w = jnp.mean(loss_w**2)
-        print(ff_val.shape, f_out.shape)
         loss_fu = all_params["data"]['u_ref']*f_out[:,0:1] - ff_val[:,0:1]
         loss_fu = jnp.mean(loss_fu**2)
         loss_fv = all_params["data"]['v_ref']*f_out[:,1:2] - ff_val[:,1:2]
