@@ -156,7 +156,7 @@ class PINN(PINNbase):
         update = PINN_update1.lower(model_states, optimiser_fn, equation_fn1, dynamic_params, static_params, static_keys, g_batch, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batches, model_fn).compile()
         
         # Training loop
-        for i in range(self.c.optimization_init_kwargs["n_steps1"]):
+        for i in tqdm(range(self.c.optimization_init_kwargs["n_steps1"])):
             keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
             p_batch = next(p_batches)
             v_batch = next(v_batches)
@@ -182,7 +182,7 @@ class PINN(PINNbase):
         update = PINN_update2.lower(model_states, optimiser_fn, equation_fn2, dynamic_params, static_params, static_keys, loss_factor, g_batch, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batches, model_fn).compile()
         j = i
         # Training loop
-        for k in range(self.c.optimization_init_kwargs["n_steps2"]):
+        for k in tqdm(range(self.c.optimization_init_kwargs["n_steps2"])):
             i = j + k
             keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
             #p_batch = random.choice(keys_next[0],train_data1['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
@@ -241,11 +241,11 @@ class PINN(PINNbase):
             
             Losses = report_fn(dynamic_params, all_params, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batch, model_fns)
             if v_pred.shape[1] == 5:
-                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}} T_error : {T_error:<{12}.{5}}")
+                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} fu_loss : {Losses[4]:<{12}.{5}} fv_loss : {Losses[5]:<{12}.{5}} fw_loss : {Losses[6]:<{12}.{5}} fp_loss : {Losses[7]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}} T_error : {T_error:<{12}.{5}}")
                 with open(self.c.report_out_dir + "reports.txt", "a") as f:
                     f.write(f"{i:<{12}} {Losses[0]:<{12}.{5}} {Losses[1]:<{12}.{5}} {Losses[2]:<{12}.{5}} {Losses[3]:<{12}.{5}} {Losses[4]:<{12}.{5}} {Losses[5]:<{12}.{5}} {Losses[6]:<{12}.{5}} {Losses[7]:<{12}.{5}} {Losses[8]:<{12}.{5}} {u_error:<{12}.{5}} {v_error:<{12}.{5}} {w_error:<{12}.{5}} {T_error:<{12}.{5}}\n")
             else:
-                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}}")
+                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} fu_loss : {Losses[4]:<{12}.{5}} fv_loss : {Losses[5]:<{12}.{5}} fw_loss : {Losses[6]:<{12}.{5}} fp_loss : {Losses[7]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}}")
                 with open(self.c.report_out_dir + "reports.txt", "a") as f:
                     f.write(f"{i:<{12}} {Losses[0]:<{12}.{5}} {Losses[1]:<{12}.{5}} {Losses[2]:<{12}.{5}} {Losses[3]:<{12}.{5}} {Losses[4]:<{12}.{5}} {Losses[5]:<{12}.{5}} {Losses[6]:<{12}.{5}} {Losses[7]:<{12}.{5}} {0.0:<{12}.{5}} {0.0:<{12}.{5}} {0.0:<{12}.{5}} {0.0:<{12}.{5}} {0.0:<{12}.{5}} {u_error:<{12}.{5}} {v_error:<{12}.{5}} {w_error:<{12}.{5}} {0.0:<{12}.{5}}\n")
             f.close()
@@ -271,11 +271,11 @@ class PINN(PINNbase):
 
             Losses = report_fn(dynamic_params, all_params, loss_factor, g_batch, ffgrid_batch, ffval_batch, p_batch, v_batch, b_batch, model_fns)
             if v_pred.shape[1] == 5:
-                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}} T_error : {T_error:<{12}.{5}}")
+                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} fu_loss : {Losses[4]:<{12}.{5}} fv_loss : {Losses[5]:<{12}.{5}} fw_loss : {Losses[6]:<{12}.{5}} fp_loss : {Losses[7]:<{12}.{5}} con_loss : {Losses[8]:<{12}.{5}} NS1_loss : {Losses[9]:<{12}.{5}} NS2_loss : {Losses[10]:<{12}.{5}} NS3_loss : {Losses[11]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}} T_error : {T_error:<{12}.{5}}")
                 with open(self.c.report_out_dir + "reports.txt", "a") as f:
                     f.write(f"{i:<{12}} {Losses[0]:<{12}.{5}} {Losses[1]:<{12}.{5}} {Losses[2]:<{12}.{5}} {Losses[3]:<{12}.{5}} {Losses[4]:<{12}.{5}} {Losses[5]:<{12}.{5}} {Losses[6]:<{12}.{5}} {Losses[7]:<{12}.{5}} {Losses[8]:<{12}.{5}} {Losses[9]:<{12}.{5}} {Losses[10]:<{12}.{5}} {Losses[11]:<{12}.{5}} {Losses[12]:<{12}.{5}} {u_error:<{12}.{5}} {v_error:<{12}.{5}} {w_error:<{12}.{5}} {T_error:<{12}.{5}}\n")
             else:
-                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}}")
+                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} fu_loss : {Losses[4]:<{12}.{5}} fv_loss : {Losses[5]:<{12}.{5}} fw_loss : {Losses[6]:<{12}.{5}} fp_loss : {Losses[7]:<{12}.{5}} con_loss : {Losses[8]:<{12}.{5}} NS1_loss : {Losses[9]:<{12}.{5}} NS2_loss : {Losses[10]:<{12}.{5}} NS3_loss : {Losses[11]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}}")
                 with open(self.c.report_out_dir + "reports.txt", "a") as f:
                     f.write(f"{i:<{12}} {Losses[0]:<{12}.{5}} {Losses[1]:<{12}.{5}} {Losses[2]:<{12}.{5}} {Losses[3]:<{12}.{5}} {Losses[4]:<{12}.{5}} {Losses[5]:<{12}.{5}} {Losses[6]:<{12}.{5}} {Losses[7]:<{12}.{5}} {Losses[8]:<{12}.{5}} {Losses[9]:<{12}.{5}} {Losses[10]:<{12}.{5}} {Losses[11]:<{12}.{5}} {0.0:<{12}.{5}} {u_error:<{12}.{5}} {v_error:<{12}.{5}} {w_error:<{12}.{5}} {0.0:<{12}.{5}}\n")
             f.close()

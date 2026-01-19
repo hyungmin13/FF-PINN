@@ -177,9 +177,9 @@ class Boundless_flow_FF(Equation):
         loss_NS3 = wt + u*wx + v*wy + w*wz + pz - all_params["data"]["viscosity"]*(wxx+wyy+wzz)-2.22*10**(-1)/(3*0.43685**2)*w
         loss_NS3 = jnp.mean(loss_NS3**2)
 
-        total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
-                    loss_factor*(weights[3]*loss_fu + weights[4]*loss_fv + weights[5]*loss_fw) + weights[6]*loss_fp + \
-                    (1-loss_factor)*(weights[7]*loss_con + weights[8]*loss_NS1 + weights[9]*loss_NS2 + weights[10]*loss_NS3)
+        total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + weights[7]*loss_con + weights[8]*loss_NS1 + weights[9]*loss_NS2 + weights[10]*loss_NS3
+                    #loss_factor*(weights[3]*loss_fu + weights[4]*loss_fv + weights[5]*loss_fw) + weights[6]*loss_fp + \
+                    #(1-loss_factor)*(weights[7]*loss_con + weights[8]*loss_NS1 + weights[9]*loss_NS2 + weights[10]*loss_NS3)
         return total_loss
     
     @staticmethod
@@ -269,9 +269,9 @@ class Boundless_flow_FF(Equation):
         loss_NS3 = wt + u*wx + v*wy + w*wz + pz - all_params["data"]["viscosity"]*(wxx+wyy+wzz)-2.22*10**(-1)/(3*0.43685**2)*w
         loss_NS3 = jnp.mean(loss_NS3**2)
 
-        total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
-                    loss_factor*(weights[3]*loss_fu + weights[4]*loss_fv + weights[5]*loss_fw + weights[6]*loss_fp) + \
-                    (1-loss_factor)*(weights[7]*loss_con + weights[8]*loss_NS1 + weights[9]*loss_NS2 + weights[10]*loss_NS3)
+        total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + weights[7]*loss_con + weights[8]*loss_NS1 + weights[9]*loss_NS2 + weights[10]*loss_NS3
+                    #loss_factor*(weights[3]*loss_fu + weights[4]*loss_fv + weights[5]*loss_fw + weights[6]*loss_fp) + \
+                    #(1-loss_factor)*(weights[7]*loss_con + weights[8]*loss_NS1 + weights[9]*loss_NS2 + weights[10]*loss_NS3)
         return total_loss, loss_u, loss_v, loss_w, loss_fu, loss_fv, loss_fw, loss_fp, loss_con, loss_NS1, loss_NS2, loss_NS3
 
 
